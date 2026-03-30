@@ -1,0 +1,37 @@
+name: Build Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Instala o Tkinter no nível do Sistema Operativo (Apenas se for Linux)
+      - name: Install system dependencies (Linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - run: pip install pyinstaller pyserial requests python-dotenv
+
+      - name: Build Daemon
+        run: pyinstaller --onefile --console --name gateway-daemon src/gateway.py
+
+      - name: Build UI
+        run: pyinstaller --onefile --noconsole --name gateway-ui ui/app.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-packages-${{ matrix.os }}
+          path: dist/
