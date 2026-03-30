@@ -5,10 +5,20 @@ import sys
 import os
 from dotenv import load_dotenv, set_key
 
+def get_real_base_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
 # --- Configuração de Caminhos ---
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+BASE_DIR = get_real_base_dir()
 ENV_FILE = os.path.join(BASE_DIR, '.env')
 SRC_DIR = os.path.join(BASE_DIR, 'src')
+
+if not getattr(sys, 'frozen', False):
+    SRC_DIR = os.path.join(BASE_DIR, 'src')
+    if SRC_DIR not in sys.path:
+        sys.path.append(SRC_DIR)
 
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)

@@ -4,6 +4,9 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -18,8 +21,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Instala o Tkinter no nível do Sistema Operativo (Apenas se for Linux)
-      - name: Install system dependencies (Linux only)
+      # Instala dependências de sistema (apenas Ubuntu)
+      - name: Install system dependencies
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y python3-tk
 
@@ -29,9 +32,9 @@ jobs:
         run: pyinstaller --onefile --console --name gateway-daemon src/gateway.py
 
       - name: Build UI
-        run: pyinstaller --onefile --noconsole --name gateway-ui ui/app.py
+        run: pyinstaller --onefile --noconsole --paths src --name gateway-ui ui/app.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binaries to Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: release-packages-${{ matrix.os }}
-          path: dist/
+          files: dist/*

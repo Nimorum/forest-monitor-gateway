@@ -1,10 +1,18 @@
 import sqlite3
 import json
 import os
+import sys
+
+def get_real_base_dir():
+    """Descobre a verdadeira pasta onde o executável ou script está a correr."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 class OfflineStorage:
     def __init__(self, db_name="offline_buffer.db"):
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        base_dir = get_real_base_dir()
         self.db_path = os.path.join(base_dir, db_name)
         self._create_table()
 

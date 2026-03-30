@@ -1,15 +1,21 @@
 import os
 import time
 import serial
-import argparse
+import sys
 import json
 from dotenv import load_dotenv
 from api_client import ForestApiClient
 from storage import OfflineStorage
 
+def get_real_base_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
 class GatewayCore:
     def __init__(self):
-        load_dotenv()
+        env_path = os.path.join(get_real_base_dir(), '.env')
+        load_dotenv(env_path)
         self.port = os.getenv('SERIAL_PORT', '/dev/ttyACM0')
         self.baud = int(os.getenv('BAUD_RATE', '115200'))
         
