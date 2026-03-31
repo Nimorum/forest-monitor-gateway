@@ -85,7 +85,7 @@ Para obter a lista completa de comandos suportados pelo seu módulo específico,
 ```text
 AT+HELP
 ```
-*(Nalgumas versões de firmware, o comando poderá ser `AT+H` ou `AT+?`)*
+*(Em algumas versões de firmware, o comando poderá ser `AT+H` ou `AT+?`)*
 
 Aqui está uma referência rápida para os comandos mais utilizados durante a configuração e depuração do Gateway:
 
