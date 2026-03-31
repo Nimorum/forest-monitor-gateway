@@ -1,86 +1,102 @@
 # Forest Monitor - LoRa Gateway 📡
 
-Este repositório contém o código do Gateway Central responsável por fazer a ponte entre a rede LPWAN (LoRa) e a infraestrutura Cloud (API Laravel).
+Este repositório contém o Gateway Core responsável por fazer a ponte entre a rede LPWAN (LoRa) e a infraestrutura Cloud (API Laravel). 
 
-## 📌 Funcionalidade
-O script atua como um serviço em segundo plano (daemon) a correr num PC local ou Raspberry Pi. As suas responsabilidades são:
-1. **Escuta Contínua:** Ler os pacotes LoRa recebidos pelo recetor USB (SX1262/SX1276).
-2. **Descodificação:** Extrair o MAC Address, coordenadas GPS (no deploy) e os dados de telemetria (sensores e Vbat).
-3. **Encaminhamento:** Fazer o POST seguro (via API Key) destes dados para o endpoint `/api/telemetry` do Backend.
-4. **Resiliência:** (A implementar) Buffer local em caso de falha de internet, garantindo a robustez do sistema distribuído.
+## 📌 Funcionalidades Principais
+O gateway atua como um router intermédio a correr num PC local ou num Raspberry Pi. As suas responsabilidades principais incluem:
+* **Escuta Contínua:** Lê os pacotes LoRa recebidos pelo recetor USB (SX1262/SX1276).
+* **Descodificação de Pacotes:** Extrai o Endereço MAC, coordenadas GPS e os dados de telemetria (sensores e Vbat).
+* **Encaminhamento Dinâmico:** Reencaminha dados de forma segura via HTTP POST para os endpoints do backend (`/nodes/register` ou `/telemetry`) utilizando uma API Key.
+* **Resiliência (Smart Retry):** Possui um buffer offline integrado em SQLite. Se a ligação à internet falhar, os pacotes são guardados localmente em segurança e retransmitidos automaticamente assim que a ligação for restaurada.
 
 ## 🛠️ Stack Tecnológica
-- **Linguagem:** Python 3.x
-- **Interface Gráfica:** `tkinter` (UI Nativa)
-- **Dependências Principais:** `pyserial` (comunicação com rádio USB), `requests` (HTTP POSTs para a API), `python-dotenv` (gestão de chaves API).
+* **Linguagem:** Python 3.11
+* **Interface Gráfica (GUI):** `tkinter` (UI Nativa para Desktop)
+* **Base de Dados:** `sqlite3` (Armazenamento offline de pacotes)
+* **Dependências:** `pyserial`, `requests`, `python-dotenv`
+* **CI/CD:** Builds automáticas para Windows e Linux via GitHub Actions usando `PyInstaller`.
 
-## 🚀 Como Executar
+## 🚀 Instalação e Utilização
 
-### Opção A: Interface Gráfica (Recomendado para Desktop)
-Uma interface visual interativa está disponível para facilitar a configuração, teste e monitorização dos dados:
-1. Instalar dependências: `pip install -r requirements.txt`
-2. Iniciar a interface: `python src/app.py`
-3. Inserir a porta de comunicação (ex: `COM3` ou `/dev/ttyACM0`) e a API Key diretamente no painel.
-4. Clicar em **Start Gateway**. As configurações são guardadas automaticamente no ficheiro `.env`.
+### Opção A: Executáveis Pré-compilados (Recomendado)
+Não é necessário instalar o Python para correr este gateway. Os binários standalone são gerados automaticamente em cada lançamento (release).
+1. Navegue até ao separador **Releases** no GitHub.
+2. Descarregue o `.zip` mais recente para o seu sistema operativo (Windows ou Ubuntu).
+3. Extraia os ficheiros e escolha o seu modo de funcionamento:
+   * `gateway-ui`: Inicia o painel de controlo gráfico para configuração fácil e monitorização em tempo real.
+   * `gateway-daemon`: Inicia o serviço de background (invisível), ideal para servidores e Raspberry Pis.
 
-### Opção B: Modo Consola / Daemon (Recomendado para Servidores/RPi)
-Para executar o gateway de forma invisível ou em sistemas sem interface gráfica:
-1. Instalar dependências: `pip install -r requirements.txt`
-2. Configurar o ficheiro `.env` na raiz do projeto com o URL do servidor, a API Key e a Porta Serial.
-3. Executar o serviço: `python src/gateway.py`
-
----
+### Opção B: Correr a partir do Código-Fonte
+Se pretender modificar o código ou executá-lo diretamente via Python:
+1. Instale as dependências necessárias:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. **Para a Interface Gráfica:** Execute `python ui/app.py`
+3. **Para o Serviço em Background:** Execute `python src/gateway.py`
 
 ## 🐧 Configuração em Ambiente Linux (Ubuntu / Raspberry Pi OS)
 
-Ao correr este gateway num ambiente Linux, a gestão de portas e permissões difere do Windows. Siga os passos abaixo para garantir a comunicação com o módulo de rádio USB.
+Ao correr este gateway num ambiente Linux, a gestão das portas USB requer permissões específicas. Siga estes passos para garantir uma comunicação sem falhas com o módulo de rádio LoRa.
 
 ### 1. Identificar a Porta de Comunicação
-Ligue o módulo LoRa USB ao computador e abra o terminal para descobrir o caminho atribuído ao dispositivo:
+Ligue o seu módulo LoRa USB e abra o terminal para descobrir o caminho que lhe foi atribuído:
 
 ```bash
-# Verificar portas USB convencionais:
 ls /dev/ttyUSB*
-
-# Se não retornar resultados, verificar portas ACM:
 ls /dev/ttyACM*
-
 ```
-(Opcional: Pode usar o comando sudo dmesg | grep tty e observar as últimas linhas para confirmar o nome exato atribuído pelo sistema quando o dispositivo é ligado).
 
-Configurar Permissões Globais (Erro "Permission denied")
-Por razões de segurança, o Linux bloqueia a leitura de portas série a utilizadores normais. Para conceder acesso permanente ao seu utilizador, é necessário adicioná-lo ao grupo dialout:
+### 2. Configurar Permissões Globais
+O Linux bloqueia o acesso às portas série para utilizadores normais por defeito. Para conceder acesso permanente ao seu utilizador e evitar erros de "Permission denied", adicione o seu utilizador ao grupo `dialout`:
 
 ```bash
 sudo usermod -a -G dialout $USER
 ```
-⚠️ Passo Obrigatório: Para que o sistema assuma o novo grupo de permissões, é estritamente necessário Terminar a Sessão (Log Out) e voltar a entrar, ou reiniciar o computador. Após o reinício, o Gateway conseguirá ler a porta /dev/tty... sem necessitar de privilégios de administrador (sudo).
+**⚠️ Passo Obrigatório:** Tem de terminar a sessão (log out) e voltar a entrar (ou reiniciar a máquina) para que as novas permissões do grupo tenham efeito.
 
-## 🔧 Teste de Comunicação (Hardware)
+## 🔧 Teste de Comunicação de Hardware
 
-Se não tiver a certeza se a placa está a responder corretamente na porta configurada, pode testar a comunicação manualmente através da Interface Gráfica ou de qualquer Monitor Série (ex: PuTTY, Arduino IDE).
-
-A placa usa comandos **AT** para configuração. Para testar, siga estes passos:
+Se não tiver a certeza de que a placa está a responder corretamente na porta configurada, pode testar a ligação manualmente utilizando o emissor de Comandos AT na `gateway-ui`.
 
 1. **Entrar no Modo de Configuração:**
-   Na caixa de envio de dados (na parte inferior da Interface Gráfica), digite o seguinte comando e clique em **Send Data**:
+   Digite o seguinte na caixa de envio de comandos e clique em **Send**:
    ```text
    +++
    ```
-   *(A placa não deve devolver nenhuma mensagem imediatamente, mas entrará em modo de escuta de comandos).*
+   *(A placa não vai responder imediatamente, mas entrará em modo de escuta de comandos).*
 
 2. **Testar a Resposta:**
-   Em seguida, envie o comando para pedir a versão do Firmware:
+   Envie o comando para solicitar a versão do firmware:
    ```text
    AT+VER
    ```
-   ✅ **Sucesso:** Se a ligação estiver correta, a placa irá responder com algo como `Ver1.2` seguido de `OK`. Isto confirma que o Gateway consegue falar com a placa!
+   ✅ **Sucesso:** A placa deverá responder com algo como `Ver1.2` seguido de `OK`. 
 
-3. **Sair do Modo de Configuração (Muito Importante):**
-   Para que a placa volte a escutar as mensagens rádio dos sensores na floresta, tem **obrigatoriamente** de sair do modo de comandos enviando:
+3. **Sair do Modo de Configuração (Crucial):**
+   Para permitir que a placa retome a escuta de pacotes de sensores remotos, tem de sair do modo de comandos enviando:
    ```text
    AT+EXIT
    ```
-   A placa responderá com `OK` e voltará ao modo de funcionamento normal (Transparente).
 
-**Dica:** Outros comandos úteis incluem `AT+HELP` (lista todos os comandos), `AT+RXCH?` (verifica o canal de receção) e `AT+SF?` (verifica o Spreading Factor).
+## 📜 Referência de Comandos AT Comuns
+
+Para obter a lista completa de comandos suportados pelo seu módulo específico, entre no Modo de Configuração (`+++`) e envie o comando de ajuda:
+```text
+AT+HELP
+```
+*(Nalgumas versões de firmware, o comando poderá ser `AT+H` ou `AT+?`)*
+
+Aqui está uma referência rápida para os comandos mais utilizados durante a configuração e depuração do Gateway:
+
+| Comando | Descrição | Resposta Esperada |
+| :--- | :--- | :--- |
+| `AT+VER` | Verificar versão do firmware | `Ver1.2 OK` |
+| `AT+HELP` | Listar todos os comandos AT disponíveis | *(Devolve a lista de comandos)* |
+| `AT+RXCH?` | Consultar Canal de Receção atual (Frequência) | `RXCH:868.125 OK` |
+| `AT+TXCH?` | Consultar Canal de Transmissão atual | `TXCH:868.125 OK` |
+| `AT+SF?` | Consultar Spreading Factor (SF) | `SF:9 OK` |
+| `AT+PWR?` | Consultar Potência de Transmissão (dBm) | `PWR:22 OK` |
+| `AT+EXIT` | Sair do Modo de Configuração | `OK` |
+
+> **⚠️ Nota Importante:** Lembre-se sempre de enviar `AT+EXIT` quando terminar a configuração. Se a placa for deixada em Modo de Configuração, irá ignorar toda a telemetria rádio recebida dos nós da floresta.
