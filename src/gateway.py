@@ -87,7 +87,7 @@ class GatewayCore:
             print(f"[ERRO RÁDIO] Pacote descartado. 'mac_address' ausente no JSON: {data}")
             return
         
-        data.set("collected_at", int(time.time()))
+        data["collected_at"] = int(time.time())
 
         method = data.get("method")
         
@@ -113,7 +113,7 @@ class GatewayCore:
 
     def _process_offline_queue(self):
         """Tenta enviar pedidos que falharam anteriormente."""
-        pending = self.db.get_pending_requests(limit=3, time_threshold_s=30) # Processa no máximo 3 de cada vez
+        pending = self.db.get_pending_requests(limit=3, time_threshold_s=10)
         
         for req in pending:
             print(f"[QUEUE] A tentar reenviar pedido ID {req['id']} (Tentativa {req['retry_count']})...")

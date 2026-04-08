@@ -25,7 +25,8 @@ class OfflineStorage:
                     endpoint TEXT NOT NULL,
                     payload TEXT NOT NULL,
                     retry_count INTEGER DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
             conn.commit()
@@ -33,30 +34,36 @@ class OfflineStorage:
     def save_request(self, endpoint, payload_dict):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            # Usamos o CURRENT_TIMESTAMP do próprio SQLite para garantir 
             cursor.execute(
-                "INSERT INTO pending_requests (endpoint, payload) VALUES (?, ?)",
+                """
+                INSERT INTO pending_requests 
+                (endpoint, payload, created_at, updated_at) 
+                VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
                 (endpoint, json.dumps(payload_dict))
             )
             conn.commit()
 
     def get_pending_requests(self, limit=5, time_threshold_s=30):
-        """Puxa apenas os primeiros X pedidos para não bloquear o loop principal."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT id, endpoint, payload, retry_count FROM pending_requests "
-                "WHERE (strftime('%s','now') - strftime('%s', created_at)) > ?) "
-                "ORDER BY id ASC LIMIT ?",
+                "WHERE (strftime('%s','now') - strftime('%s', updated_at)) > ? "
+                "ORDER BY updated_at ASC LIMIT ?",
                 (time_threshold_s, limit))
             rows = cursor.fetchall()
             
             return [{"id": r[0], "endpoint": r[1], "payload": json.loads(r[2]), "retry_count": r[3]} for r in rows]
 
     def increment_retry(self, request_id):
-        """Aumenta o contador de tentativas de um pedido."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("UPDATE pending_requests SET retry_count = retry_count + 1 WHERE id = ?", (request_id,))
+            cursor.execute(
+                "UPDATE pending_requests SET retry_count = retry_count + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+                (request_id,)
+            )
             conn.commit()
 
     def delete_request(self, request_id):

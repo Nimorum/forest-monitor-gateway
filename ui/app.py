@@ -123,7 +123,7 @@ class GatewayUI:
     def start_gateway(self):
         self.save_env()
 
-        load_dotenv(ENV_FILE)
+        load_dotenv(ENV_FILE, override=True)
 
         self.start_btn.config(state=tk.DISABLED)
         self.stop_btn.config(state=tk.NORMAL)
