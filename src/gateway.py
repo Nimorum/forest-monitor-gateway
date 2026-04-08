@@ -12,10 +12,12 @@ def get_real_base_dir():
         return os.path.dirname(sys.executable)
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
+BASE_DIR = get_real_base_dir()
+ENV_FILE = os.path.join(BASE_DIR, '.env')
+
 class GatewayCore:
     def __init__(self):
-        env_path = os.path.join(get_real_base_dir(), '.env')
-        load_dotenv(env_path)
+        load_dotenv(ENV_FILE)
         self.port = os.getenv('SERIAL_PORT', '/dev/ttyACM0')
         self.baud = int(os.getenv('BAUD_RATE', '115200'))
         
@@ -84,6 +86,8 @@ class GatewayCore:
         if not mac:
             print(f"[ERRO RÁDIO] Pacote descartado. 'mac_address' ausente no JSON: {data}")
             return
+        
+        data.set("collected_at", int(time.time()))
 
         method = data.get("method")
         
@@ -109,7 +113,7 @@ class GatewayCore:
 
     def _process_offline_queue(self):
         """Tenta enviar pedidos que falharam anteriormente."""
-        pending = self.db.get_pending_requests(limit=3) # Processa no máximo 3 de cada vez
+        pending = self.db.get_pending_requests(limit=3, time_threshold_s=30) # Processa no máximo 3 de cada vez
         
         for req in pending:
             print(f"[QUEUE] A tentar reenviar pedido ID {req['id']} (Tentativa {req['retry_count']})...")

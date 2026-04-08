@@ -39,11 +39,15 @@ class OfflineStorage:
             )
             conn.commit()
 
-    def get_pending_requests(self, limit=5):
+    def get_pending_requests(self, limit=5, time_threshold_s=30):
         """Puxa apenas os primeiros X pedidos para não bloquear o loop principal."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, endpoint, payload, retry_count FROM pending_requests ORDER BY id ASC LIMIT ?", (limit,))
+            cursor.execute(
+                "SELECT id, endpoint, payload, retry_count FROM pending_requests "
+                "WHERE (strftime('%s','now') - strftime('%s', created_at)) > ?) "
+                "ORDER BY id ASC LIMIT ?",
+                (time_threshold_s, limit))
             rows = cursor.fetchall()
             
             return [{"id": r[0], "endpoint": r[1], "payload": json.loads(r[2]), "retry_count": r[3]} for r in rows]
