@@ -34,6 +34,21 @@ Se pretender modificar o código ou executá-lo diretamente via Python:
    ```
 2. **Para a Interface Gráfica:** Execute `python ui/app.py`
 3. **Para o Serviço em Background:** Execute `python src/gateway.py`
+   
+## 📊 Exportação de Telemetria para CSV
+
+Se a variável de ambiente `LOG_TELEMETRY` estiver ativa, o gateway regista todos os pacotes recebidos (incluindo o RSSI) na base de dados local SQLite. Para extrair estes dados para análise e criação de gráficos (ideal para testes de alcance), pode exportar o histórico completo para um formato `.csv`.
+
+Utilize a flag `--export` no terminal. O sistema irá gerar um ficheiro `telemetry_export.csv` na pasta raiz e terminar imediatamente, sem iniciar o módulo de rádio.
+
+**Executável (Linux):**
+`./gateway-daemon --export`
+
+**Executável (Windows):**
+`gateway-daemon.exe --export`
+
+**Código-Fonte:**
+`python src/gateway.py --export`
 
 ## 🐧 Configuração em Ambiente Linux (Ubuntu / Raspberry Pi OS)
 
