@@ -10,7 +10,6 @@ class ForestApiClient:
         }
 
     def _post(self, endpoint, payload):
-        """Método interno para tratar os erros de forma inteligente."""
         url = f"{self.base_url}{endpoint}"
         try:
             response = requests.post(url, json=payload, headers=self.headers, timeout=5)

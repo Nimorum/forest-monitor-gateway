@@ -28,6 +28,8 @@ class GatewayCore:
         self.running = False
         self.max_retries = int(os.getenv('MAX_RETRIES', '5'))
 
+        self.log_telemetry = os.getenv('LOG_TELEMETRY', 'False').lower() in ('true', '1', 't')
+        
     def start(self):
         self.running = True
         self._connect_serial()
@@ -37,25 +39,21 @@ class GatewayCore:
         self.running = False
         if self.ser and self.ser.is_open:
             self.ser.close()
-            print("[SISTEMA] Porta Série fechada.")
+            print("[SYSTEM] Serial port closed.")
 
     def _connect_serial(self):
         try:
             self.ser = serial.Serial(self.port, self.baud, timeout=1)
-            print(f"[OK] Conectado a {self.port} a {self.baud} bps.")
+            print(f"[OK] Connected to {self.port} at {self.baud} bps.")
         except serial.SerialException as e:
-            print(f"[ERRO] Falha ao abrir porta série: {e}")
+            print(f"[ERROR] Failed to open serial port: {e}")
 
     def run_loop(self):
-        """O Loop Principal Independente"""
-        print("[SISTEMA] Main Loop iniciado...")
+        print("[SYSTEM] Main loop started...")
         while self.running:
-
             self._read_radio()
-            
             self._process_offline_queue()
-            
-            time.sleep(0.05) # Pequena pausa para não esgotar o CPU
+            time.sleep(0.05)
 
     def _read_radio(self):
         if not self.ser or not self.ser.is_open:
@@ -65,80 +63,111 @@ class GatewayCore:
             data = self.ser.readline()
             try:
                 decoded = data.decode('utf-8').strip()
-                if decoded:
-                    print(f"[RÁDIO] Recebido: {decoded}")
-                    self._handle_incoming_data(decoded)
-            except Exception as e:
-                pass # Ignorar lixo na linha
+                if not decoded:
+                    return
 
-    def _handle_incoming_data(self, raw_string):
-        """
-        Faz o parse da string LoRa, valida o MAC e encaminha 
-        para o endpoint correto baseado no campo 'method'.
-        """
+                if decoded.startswith('AT') or decoded.startswith('+'):
+                    print(f"[AT RESPONSE] {decoded}")
+                    return
+
+                if decoded.startswith('{'):
+                    self._handle_json_payload(decoded)
+                    return
+
+                if len(decoded) <= 2:
+                    try:
+                        int(decoded, 16)
+                        self._handle_rssi_payload(decoded)
+                    except ValueError:
+                        pass
+
+            except Exception:
+                pass
+                
+    def _handle_json_payload(self, json_string):
         try:
-            data = json.loads(raw_string)
+            data = json.loads(json_string)
         except json.JSONDecodeError:
-            print(f"[ERRO RÁDIO] Formato inválido. Não é um JSON: {raw_string}")
+            print(f"[RADIO ERROR] Invalid JSON format: {json_string}")
             return
 
         mac = data.get("mac_address")
         if not mac:
-            print(f"[ERRO RÁDIO] Pacote descartado. 'mac_address' ausente no JSON: {data}")
+            print(f"[RADIO ERROR] Packet dropped. 'mac_address' missing: {data}")
             return
-        
+
         data["collected_at"] = int(time.time())
+
+        if self.log_telemetry:
+            self.db.log_telemetry(data)
 
         method = data.get("method")
         
         if method == "register":
             endpoint = "/nodes/register"
-            print(f"[GATEWAY] A processar REGISTO para o nó {mac}...")
+            print(f"[GATEWAY] Processing REGISTRATION for node {mac}...")
+            print(f"[GATEWAY] Payload: {json.dumps(data)}")
             success, response, error_type = self.api.register_node(data)
             
         elif method == "telemetry":
             endpoint = "/telemetry"
-            print(f"[GATEWAY] A processar TELEMETRIA do nó {mac}...")
+            print(f"[GATEWAY] Processing TELEMETRY from node {mac}...")
+            print(f"[GATEWAY] Payload: {json.dumps(data)}")
             success, response, error_type = self.api.send_telemetry(data)
             
         else:
-            print(f"[ERRO RÁDIO] Método '{method}' desconhecido para o MAC {mac}.")
+            print(f"[RADIO ERROR] Unknown method '{method}' for MAC {mac}.")
             return
 
         if success:
-            print(f"[API SUCCESS] Dados enviados para {endpoint} com sucesso!")
+            print(f"[API SUCCESS] Data sent to {endpoint} successfully!")
         else:
-            print(f"[API FAIL] {response}. A guardar na base de dados para reenvio.")
+            print(f"[API FAIL] {response}. Saving to database for resend.")
             self.db.save_request(endpoint, data)
 
+    def _handle_rssi_payload(self, rssi_tail):
+        try:
+            rssi_val = -int(rssi_tail, 16)
+            print(f"[DEBUG] RSSI: {rssi_val} dBm")
+            if not self.log_telemetry:
+                return
+            self.db.update_latest_telemetry_rssi(rssi_val)
+        except Exception as e:
+            print(f"[RADIO ERROR] Failed to parse RSSI: {e}")
+
     def _process_offline_queue(self):
-        """Tenta enviar pedidos que falharam anteriormente."""
         pending = self.db.get_pending_requests(limit=3, time_threshold_s=10)
         
         for req in pending:
-            print(f"[QUEUE] A tentar reenviar pedido ID {req['id']} (Tentativa {req['retry_count']})...")
+            print(f"[QUEUE] Attempting to resend request ID {req['id']} (Attempt {req['retry_count']})...")
             
             success, response, error_type = self.api._post(req['endpoint'], req['payload'])
             
             if success:
-                print(f"[QUEUE] Pedido ID {req['id']} enviado com sucesso! A apagar da DB.")
+                print(f"[QUEUE] Request ID {req['id']} sent successfully! Deleting from DB.")
                 self.db.delete_request(req['id'])
             else:
                 if error_type == "NETWORK_ERROR":
-                    print("[QUEUE] Sem internet.")
-                    break # Se não há net, não vale a pena tentar os próximos pedidos
+                    print("[QUEUE] Network error detected. Keeping request in queue for next attempt.")
+                    break
                 
                 elif error_type == "HTTP_ERROR" or error_type == "UNKNOWN_ERROR":
                     self.db.increment_retry(req['id'])
                     if req['retry_count'] >= self.max_retries:
-                        print(f"[QUEUE] Pedido ID {req['id']} falhou demasiadas vezes ({self.max_retries}). Removido definitivamente.")
+                        print(f"[QUEUE] Request ID {req['id']} failed too many times ({self.max_retries}). Permanently removed.")
                         self.db.delete_request(req['id'])
 
 if __name__ == "__main__":
-    print("[SISTEMA] A arrancar Forest Gateway em Modo Daemon...")
+    if len(sys.argv) > 1 and sys.argv[1] == "--export":
+        print("[SYSTEM] Exporting telemetry log to CSV...")
+        db = OfflineStorage()
+        db.export_telemetry_to_csv()
+        sys.exit(0)
+
+    print("[SYSTEM] Starting Forest Gateway in Daemon Mode...")
     core = GatewayCore()
     try:
         core.start()
     except KeyboardInterrupt:
         core.stop()
-        print("\n[SISTEMA] Gateway encerrado pelo utilizador.")
+        print("\n[SYSTEM] Gateway shut down by user.")

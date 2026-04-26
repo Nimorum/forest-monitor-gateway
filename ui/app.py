@@ -10,7 +10,6 @@ def get_real_base_dir():
         return os.path.dirname(sys.executable)
     return os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-# --- Configuração de Caminhos ---
 BASE_DIR = get_real_base_dir()
 ENV_FILE = os.path.join(BASE_DIR, '.env')
 SRC_DIR = os.path.join(BASE_DIR, 'src')
@@ -26,7 +25,6 @@ if SRC_DIR not in sys.path:
 from gateway import GatewayCore
 
 class TextRedirector:
-    """Captura todos os print() do sistema e injeta na interface gráfica de forma segura."""
     def __init__(self, widget):
         self.widget = widget
 
@@ -54,14 +52,13 @@ class GatewayUI:
         self._build_interface()
 
         sys.stdout = TextRedirector(self.log_area)
-        print("[SISTEMA] Interface Gráfica inicializada. Pronta a arrancar.")
+        print("[SYSTEM] Graphical Interface initialized. Ready to start.")
 
     def _build_interface(self):
-        """Constrói os elementos visuais da janela."""
-        config_frame = tk.LabelFrame(self.root, text=" Configurações do Sistema ", padx=10, pady=10)
+        config_frame = tk.LabelFrame(self.root, text=" System Configuration ", padx=10, pady=10)
         config_frame.pack(pady=10, fill=tk.X, padx=15)
 
-        tk.Label(config_frame, text="Porta (COM/TTY):").grid(row=0, column=0, sticky=tk.W)
+        tk.Label(config_frame, text="Port (COM/TTY):").grid(row=0, column=0, sticky=tk.W)
         self.port_entry = tk.Entry(config_frame, width=20)
         self.port_entry.grid(row=0, column=1, padx=5, pady=2)
         self.port_entry.insert(0, os.getenv('SERIAL_PORT', '/dev/ttyACM0'))
@@ -81,16 +78,20 @@ class GatewayUI:
         self.key_entry.grid(row=2, column=1, columnspan=3, sticky=tk.W, padx=5)
         self.key_entry.insert(0, os.getenv('API_KEY', ''))
 
-        self.save_btn = tk.Button(config_frame, text="Guardar no .env", command=self.save_env)
+        self.log_telemetry_var = tk.StringVar(value=os.getenv('LOG_TELEMETRY', 'False'))
+        self.log_chk = tk.Checkbutton(config_frame, text="Enable Telemetry Logging (CSV)", variable=self.log_telemetry_var, onvalue="True", offvalue="False")
+        self.log_chk.grid(row=3, column=0, sticky=tk.W, pady=10)
+
+        self.save_btn = tk.Button(config_frame, text="Save to .env", command=self.save_env)
         self.save_btn.grid(row=3, column=1, sticky=tk.W, pady=10)
 
         control_frame = tk.Frame(self.root)
         control_frame.pack(pady=5, fill=tk.X, padx=15)
 
-        self.start_btn = tk.Button(control_frame, text="Ligar Gateway", command=self.start_gateway, bg="#28a745", fg="white", width=15)
+        self.start_btn = tk.Button(control_frame, text="Start Gateway", command=self.start_gateway, bg="#28a745", fg="white", width=15)
         self.start_btn.pack(side=tk.LEFT, padx=5)
 
-        self.stop_btn = tk.Button(control_frame, text="Parar Gateway", command=self.stop_gateway, bg="#dc3545", fg="white", state=tk.DISABLED, width=15)
+        self.stop_btn = tk.Button(control_frame, text="Stop Gateway", command=self.stop_gateway, bg="#dc3545", fg="white", state=tk.DISABLED, width=15)
         self.stop_btn.pack(side=tk.LEFT, padx=5)
 
         self.log_area = scrolledtext.ScrolledText(self.root, width=85, height=20, bg="#1e1e1e", fg="#d4d4d4")
@@ -103,7 +104,7 @@ class GatewayUI:
         self.send_entry.pack(side=tk.LEFT, padx=5)
         self.send_entry.bind("<Return>", self.send_data)
 
-        self.send_btn = tk.Button(bottom_frame, text="Enviar AT", command=self.send_data, state=tk.DISABLED)
+        self.send_btn = tk.Button(bottom_frame, text="Send AT", command=self.send_data, state=tk.DISABLED)
         self.send_btn.pack(side=tk.LEFT, padx=5)
 
     def save_env(self):
@@ -115,10 +116,11 @@ class GatewayUI:
             set_key(ENV_FILE, 'BAUD_RATE', self.baud_entry.get().strip())
             set_key(ENV_FILE, 'API_URL', self.url_entry.get().strip())
             set_key(ENV_FILE, 'API_KEY', self.key_entry.get().strip())
+            set_key(ENV_FILE, 'LOG_TELEMETRY', self.log_telemetry_var.get())
             
-            print("[SISTEMA] Configurações guardadas com sucesso no .env")
+            print("[SYSTEM] Configurations successfully saved to .env")
         except Exception as e:
-            print(f"[ERRO] Falha ao guardar .env: {e}")
+            print(f"[ERROR] Failed to save .env: {e}")
 
     def start_gateway(self):
         self.save_env()
@@ -150,12 +152,11 @@ class GatewayUI:
                 print(f"[AT TX] → {msg}")
                 self.send_entry.delete(0, tk.END)
         else:
-            print("[AVISO] Não pode enviar comandos AT. A placa não está ligada.")
+            print("[WARNING] Cannot send AT commands. The board is not connected.")
 
 if __name__ == "__main__":
     root = tk.Tk()
     
-    # Restaura o output normal se a janela for fechada (boa prática)
     def on_closing():
         sys.stdout = sys.__stdout__
         root.destroy()
