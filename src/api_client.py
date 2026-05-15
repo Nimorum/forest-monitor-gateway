@@ -17,12 +17,11 @@ class ForestApiClient:
             return True, response.json(), None
             
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-            # Erro de Rede (Sem internet, DNS falhou, etc) - Tentar infinitamente
-            return False, "Falha de rede (Sem Internet)", "NETWORK_ERROR"
+            return False, "Network error", "NETWORK_ERROR"
             
         except requests.exceptions.HTTPError as e:
             # Erro do Servidor (500, 404, 403, 422, etc) - Tentar X vezes
-            return False, f"Erro da API: {e}", "HTTP_ERROR"
+            return False, f"API error: {e}", "HTTP_ERROR"
             
         except Exception as e:
             return False, str(e), "UNKNOWN_ERROR"
