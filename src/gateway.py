@@ -149,6 +149,7 @@ class GatewayCore:
             else:
                 if error_type == "NETWORK_ERROR":
                     print("[QUEUE] Network error detected. Keeping request in queue for next attempt.")
+                    self.db.update_request_timestamp(req['id'])
                     break
                 
                 elif error_type == "HTTP_ERROR" or error_type == "UNKNOWN_ERROR":

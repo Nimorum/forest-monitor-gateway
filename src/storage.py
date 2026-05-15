@@ -82,6 +82,15 @@ class OfflineStorage:
             cursor.execute("DELETE FROM pending_requests WHERE id = ?", (request_id,))
             conn.commit()
 
+    def update_request_timestamp(self, request_id):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE pending_requests SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+                (request_id,)
+            )
+            conn.commit()
+
     def log_telemetry(self, data):
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
