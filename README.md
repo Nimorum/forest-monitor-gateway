@@ -9,6 +9,12 @@ O gateway atua como um router intermédio a correr num PC local ou num Raspberry
 * **Encaminhamento Dinâmico:** Reencaminha dados de forma segura via HTTP POST para os endpoints do backend (`/nodes/register` ou `/telemetry`) utilizando uma API Key.
 * **Resiliência (Smart Retry):** Possui um buffer offline integrado em SQLite. Se a ligação à internet falhar, os pacotes são guardados localmente em segurança e retransmitidos automaticamente assim que a ligação for restaurada.
 
+## 🔗 Ecossistema do Projeto
+O sistema opera numa arquitetura *End-to-End* composta por três camadas independentes. Consulte os restantes repositórios:
+1. **[Forest Monitor - Cloud Backend](https://github.com/Nimorum/forest-monitor-backend):** API RESTful e *Dashboard* de visualização cartográfica (IDW) e alertas.
+2. **[Forest Monitor - Edge Gateway](https://github.com/Nimorum/forest-monitor-gateway):** (Este repositório)
+3. **[Forest Monitor - Sensor Nodes](https://github.com/Nimorum/forest-monitor-nodes):** *Firmware* C++ para ESP32 (Aquisição de dados e orquestração de *Deep Sleep*).
+
 ## 🛠️ Stack Tecnológica
 * **Linguagem:** Python 3.11
 * **Interface Gráfica (GUI):** `tkinter` (UI Nativa para Desktop)
